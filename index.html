@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON ROYALE - Free-to-Play Casino Arcade</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="module">
+        import { GameManager } from './js/systems/GameManager.js';
+        import { AudioManager } from './js/systems/AudioManager.js';
+        import { SaveManager } from './js/systems/SaveManager.js';
+        import { ProgressionManager } from './js/systems/ProgressionManager.js';
+        import { RandomManager } from './js/systems/RandomManager.js';
+        import { AchievementManager } from './js/systems/AchievementManager.js';
+        import { BlackjackGame } from './js/games/blackjack.js';
+
+        // Initialize systems
+        const gameManager = new GameManager();
+        const audioManager = new AudioManager();
+        const saveManager = new SaveManager();
+        const progressionManager = new ProgressionManager();
+        const randomManager = new RandomManager();
+        const achievementManager = new AchievementManager();
+        const blackjackGame = new BlackjackGame();
+
+        // Start when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize save system
+            saveManager.init();
+            
+            // Load saved data
+            const savedData = saveManager.load();
+            if (savedData) {
+                progressionManager.load(savedData.progression);
+                gameManager.load(savedData.gameState);
+            }
+            
+            // Build and update UI
+            buildLobby();
+            updateUI();
+            
+            // Set up event listeners
+            setupEventListeners();
+            
+            // Start ambient music
+            audioManager.playAmbient();
+        });
+
+        /* ========================================== */
+        /* LOBUI BUILDING */
+        /* ========================================== */
+
+        function buildLobby() {
+            const root = document.getElementById('root');
+            if (!root) return;
+            
+            root.innerHTML = `
+                <div class="lobby">
+                    <!-- Topbar -->
+                    <header class="topbar">
+                        <div class="logo">
+                            <div class="logo-icon">NR</div>
+                            <div class="logo-text">NEON ROYALE</div>
+                        </div>
+                        
+                        <div class="status">
+                            <div class="status-item">
+                                <span class="label">ARCADE CREDITS</span>
+                                <span class="value" id="credits-display">${gameManager.getCredits()}</span>
+                                <span class="label">(fictional)</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="label">LEVEL</span>
+                                <span class="value" id="level-display">1</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="label">XP</span>
+                                <span class="value" id="xp-display">0</span>
+                                <span class="total">/100</span>
+                            </div>
+                            <button class="btn btn-secondary settings-btn" style="font-size: 12px; padding: 6px 12px;">SETTINGS</button>
+                        </div>
+                    </header>
+                    
+                    <!-- Navigation -->
+                    <nav class="nav" role="tablist">
+                        <a href="#" data-section="home" class="active">HOME</a>
+                        <a href="#" data-section="games">GAMES</a>
+                        <a href="#" data-section="arcade">ARCADE</a>
+                        <a href="#" data-section="tournaments">TOURNAMENTS</a>
+                        <a href="#" data-section="collection">COLLECTION</a>
+                        <a href="#" data-section="profile">PROFILE</a>
+                        <a href="#" data-section="settings">SETTINGS</a>
+                    </nav>
+                    
+                    <!-- Main content area -->
+                    <main class="main-content">
+                        <!-- Home Section -->
+                        <section class="game-section home" id="home-section">
+                            <div class="dashboard">
+                                <h2>Player Dashboard</h2>
+                                <div class="credits">
+                                    <span class="label">ARCADE CREDITS</span>
+                                    <span class="value" id="dashboard-credits">${gameManager.getCredits()}</span>
+                                    <span class="label">NO REAL-WORLD VALUE</span>
+                                </div>
+                                <div class="xp-bar">
+                                    <div class="fill" style="width: 0%"></div>
+                                </div>
+                                <div class="xp-info">
+                                    <span class="current" id="xp-current">0</span> / <span class="total" id="xp-total">100</span> XP
+                                </div>
+                            </div>
+                            
+                            <div class="categories">
+                                <div class="category-card" data-game-type="blackjack">
+                                    <div class="category-icon">♠</div>
+                                    <h3>Blackjack</h3>
+                                    <p>Arcade version of 21</p>
+                                </div>
+                                <div class="category-card" data-game-type="roulette">
+                                    <div class="category-icon">🎡</div>
+                                    <h3>Roulette</h3>
+                                    <p>Wheel of fortune</p>
+                                </div>
+                                <div class="category-card" data-game-type="slots">
+                                    <div class="category-icon">🎰</div>
+                                    <h3>Slots</h3>
+                                    <p>Spin the reels</p>
+                                </div>
+                                <div class="category-card" data-game-type="dice">
+                                    <div class="category-icon">🎲</div>
+                                    <h3>Dice Games</h3>
+                                    <p>Roll and win</p>
+                                </div>
+                                <div class="category-card" data-game-type="minigames">
+                                    <div class="category-icon">⚡</div>
+                                    <h3>Mini-Games</h3>
+                                    <p>Fast arcade challenges</p>
+                                </div>
+                            </div>
+                            
+                            <div class="play-now-container">
+                                <button class="btn btn-primary play-now">PLAY NOW</button>
+                            </div>
+                            
+                            <!-- Daily Challenges -->
+                            <div class="daily-challenges">
+                                <h3>Daily Challenges</h3>
+                                <div class="daily-challenge">
+                                    <span>Win 3 rounds</span>
+                                    <button class="daily-claim">Claim 20 XP</button>
+                                </div>
+                                <div class="daily-challenge">
+                                    <span>Play 5 games</span>
+                                    <button class="daily-claim">Claim 20 XP</button>
+                                </div>
+                            </div>
+                        </section>
+                        
+                        <!-- Games Section -->
+                        <section class="game-section games" id="games-section">
+                            <h2>Game Library</h2>
+                            <p class="section-description">Choose from our arcade collection</p>
+                            <div class="game-grid">
+                                <!-- Blackjack game will be injected here -->
+                                <div class="game-card" data-game="blackjack">
+                                    <div class="game-image">
+                                        <div style="width:100%;height:180px;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;">
+                                            <span style="color:var(--muted);font-family:'Orbitron',sans-serif;">Blackjack</span>
+                                        </div>
+                                    </div>
+                                    <div class="game-info">
+                                        <h3>Blackjack Arcade</h3>
+                                        <span class="type">Table-Style Game</span>
+                                        <p>Beat the dealer without going over 21. Place your bets and use strategy to win fictional arcade credits and XP.</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="game-card" data-game="roulette">
+                                    <div class="game-image">
+                                        <div style="width:100%;height:180px;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;">
+                                            <span style="color:var(--muted);font-family:'Orbitron',sans-serif;">Roulette</span>
+                                        </div>
+                                    </div>
+                                    <div class="game-info">
+                                        <h3>Roulette Arcade</h3>
+                                        <span class="type">Wheel Game</h3>
+                                        <p>Predict where the ball lands on the neon wheel. Challenge modes: color, odd/even, high/low, exact number.</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="game-card" data-game="slots">
+                                    <div class="game-image">
+                                        <div style="width:100%;height:180px;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;">
+                                            <span style="color:var(--muted);font-family:'Orbitron',sans-serif;">Slots</span>
+                                        </div>
+                                    </div>
+                                    <div class="game-info">
+                                        <h3>Neon Slots</h3>
+                                        <span class="type">Arcade Machine</h3>
+                                        <p>Spin the reels on themed slot machines. Fantasy, sci-fi, and cyberpunk themes.</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="game-card" data-game="dice">
+                                    <div class="game-image">
+                                        <div style="width:100%;height:180px;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;">
+                                            <span style="color:var(--muted);font-family:'Orbitron',sans-serif;">Dice</span>
+                                        </div>
+                                    </div>
+                                    <div class="game-info">
+                                        <h3>Dice Arcade</h3>
+                                        <span class="type">Dice Game</h3>
+                                        <p>High roll, low roll, dice poker and more. Choose your difficulty and test your luck.</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="game-card" data-game="minigames">
+                                    <div class="game-image">
+                                        <div style="width:100%;height:180px;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;">
+                                            <span style="color:var(--muted);font-family:'Orbitron',sans-games;">Mini</span>
+                                        </div>
+                                    </div>
+                                    <div class="game-info">
+                                        <h3>Mini-Games</h3>
+                                        <span class="type">Arcade Challenges</h3>
+                                        <p>Coin catcher, lucky wheel, card flip and more. Skill-based games for quick fun.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        
+                        <!-- Blackjack Section -->
+                        <section class="game-section blackjack" id="blackjack-section" hidden>
+                            <div class="blackjack-table">
+                                <div class="blackjack-header">
+                                    <h2>Blackjack Arcade</h2>
+                                    <div class="credit-display">
+                                        <span>Credits: <span class="value" id="bj-credits-display">${gameManager.getCredits()}</span></span>
+                                        <span class="label">(fictional)</span>
+                                    </div>
+                                </div>
+                                <div class="bet-area">
+                                    <h3>Place Your Bet</h3>
+                                    <div class="bet-input-wrapper">
+                                        <input type="number" class="bet-input" min="1" placeholder="Enter bet amount">
+                                        <span class="min-bet">Minimum 1 credit</span>
+                                    </div>
+                                    <button class="btn btn-primary" id="place-bet-btn">Place Bet</button>
+                                </div>
+                                <div class="table-display">
+                                    <div class="dealer-area">
+                                        <div class="hand"><div class="total" id="dealer-total">?</div><div class="hand-cards" id="dealer-hand"></div></div>
+                                    </div>
+                                    <div class="player-area">
+                                        <div class="hand"><div class="total" id="player-total">?</div><div class="hand-cards" id="player-hand"></div></div>
+                                    </div>
+                                </div>
+                                <div class="controls">
+                                    <button class="control-btn control-btn-primary hit-btn" disabled>Hit</button>
+                                    <button class="control-btn control-btn-primary stand-btn" disabled>Stand</button>
+                                    <button class="control-btn control-btn-secondary new-round-btn" style="display:none;">New Round</button>
+                                </div>
+                                <div class="result-message" id="result-message"></div>
+                            </div>
+                        </section>
+                        <!-- Roulette Section -->
+                        <section class="game-section roulette" id="roulette-section" hidden>
+                            <div class="roulette-container">
+                                <div class="roulette-header">
+                                    <h2>Roulette Arcade</h2>
+                                    <div class="credit-display">
+                                        <span>Credits: <span class="value" id="roulette-credits-display">${gameManager.getCredits()}</span></span>
+                                        <span class="label">(fictional)</span>
+                                    </div>
+                                </div>
+                                <div class="roulette-area">
+                                    <div class="roulette-wheel" role="button" tabindex="0" onfocus="this.click()"></div>
+                                    <div class="roulette-ball"></div>
+                                    <div class="betting-area">
+                                        <h3>Select Challenge Mode</h3>
+                                        <div class="mode-options">
+                                            <button class="mode-btn active" data-mode="color">Predict Color</button>
+                                            <button class="mode-btn" data-mode="odd_even">Predict Odd/Even</button>
+                                            <button class="mode-btn" data-mode="high_low">Predict High/Low</button>
+                                            <button class="mode-btn" data-mode="exact">Exact Number</button>
+                                        </div>
+                                    </div>
+                                    <div class="bet-area">
+                                        <h3>Place Your Bet</h3>
+                                        <input type="number" class="bet-input" min="1" placeholder="Enter bet amount">
+                                        <button class="btn btn-primary place-bet-btn">Place Bet</button>
+                                    </div>
+                                </div>
+                                <div class="result-area">
+                                    <div class="result-message" id="roulette-result"></div>
+                                </div>
+                            </div>
+                        </section>
+                        <!-- Arcade Section -->
+                        <section class="game-section arcade" id="arcade-section" hidden>
+                            <h2>Arcade Mode</h2>
+                            <p>Single-player arcade challenges</p>
+                        </section>
+                        
+                        <!-- Tournaments Section -->
+                        <section class="game-section tournaments" id="tournaments-section" hidden>
+                            <h2>Tournaments</h2>
+                            <p>Weekly leaderboard competitions</p>
+                        </section>
+                        
+                        <!-- Collection Section -->
+                        <section class="game-section collection" id="collection-section" hidden>
+                            <h2>Collection</h2>
+                            <p>Unlocked cosmetics and achievements</p>
+                        </section>
+                        
+                        <!-- Profile Section -->
+                        <section class="game-section profile" id="profile-section" hidden>
+                            <h2>Profile</h2>
+                            <div class="player-stats">
+                                <div class="stat">
+                                    <span>Level</span>
+                                    <span id="profile-level">1</span>
+                                </div>
+                                <div class="stat">
+                                    <span>XP</span>
+                                    <span id="profile-xp">0</span>
+                                </div>
+                                <div class="stat">
+                                    <span>Games Played</span>
+                                    <span id="profile-games">0</span>
+                                </div>
+                                <div class="stat">
+                                    <span>Achievements</span>
+                                    <span id="profile-achievements">0</span>
+                                </div>
+                            </div>
+                        </section>
+                        
+                        <!-- Settings Section -->
+                        <section class="game-section settings" id="settings-section" hidden>
+                            <h2>Settings</h2>
+                            <div class="settings-grid">
+                                <div class="setting-row">
+                                    <span>Master Volume</span>
+                                    <input type="range" min="0" max="1" step="0.1" value="0.7">
+                                </div>
+                                <div class="setting-row">
+                                    <span>Music Volume</span>
+                                    <input type="range" min="0" max="1" step="0.1" value="0.7">
+                                </div>
+                                <div class="setting-row">
+                                    <span>SFX Volume</span>
+                                    <input type="range" min="0" max="1" step="0.1" value="0.8">
+                                </div>
+                                <div class="setting-row">
+                                    <span>Ambience Volume</span>
+                                    <input type="range" min="0" max="1" step="0.1" value="0.5">
+                                </div>
+                                <div class="setting-row">
+                                    <span>Reduce Motion</span>
+                                    <input type="checkbox" id="reduce-motion">
+                                </div>
+                                <div class="setting-row">
+                                    <span>High Contrast</span>
+                                    <input type="checkbox" id="high-contrast">
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary" id="save-settings">Save Settings</button>
+                        </section>
+                    </main>
+                    
+                    <!-- Footer -->
+                    <footer>
+                        <p>NEON ROYALE - Free-to-Play Arcade Casino <span id="credits-label">ARCADE CREDITS — NO REAL-WORLD VALUE</span></p>
+                    </footer>
+                </div>
+            `;
+            
+            // Set up navigation
+            setupNav();
+            setupGameCards();
+        }
+
+        /* ========================================== */
+        /* NAVIGATION SETUP */
+        /* ========================================== */
+
+        function setupNav() {
+            const navLinks = document.querySelectorAll('.nav a');
+            
+            navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    navLinks.forEach(l => l.classList.remove('active'));
+                    link.classList.add('active');
+                    
+                    const section = link.getAttribute('data-section');
+                    navigateToSection(section);
+                });
+            });
+        }
+
+        function navigateToSection(section) {
+            const sections = document.querySelectorAll('.game-section');
+            sections.forEach(s => s.classList.add('hidden'));
+            
+            const selected = document.querySelector(`.game-section.${section}`);
+            if (selected) {
+                selected.classList.remove('hidden');
+            }
+            
+            // Update active nav link
+            navLinks.forEach(l => l.classList.remove('active'));
+            const activeLink = document.querySelector(`.nav a[data-section="${section}"]`);
+            if (activeLink) {
+                activeLink.classList.add('active');
+            }
+        }
+
+        /* ========================================== */
+        /* GAME CARD CLICKS */
+        /* ========================================== */
+
+        function setupGameCards() {
+            const gameCards = document.querySelectorAll('.game-card');
+            
+            gameCards.forEach(card => {
+                card.addEventListener('click', () => {
+                    const gameType = card.getAttribute('data-game');
+                    launchGame(gameType);
+                });
+            });
+        }
+
+        function launchGame(gameType) {
+            showToast(`Loading ${gameType}...`);
+            
+            switch (gameType) {
+                case 'blackjack':
+                    document.getElementById('games-section').classList.add('hidden');
+                    document.getElementById('blackjack-section').classList.remove('hidden');
+                    # Initialize blackjack game
+                    setTimeout(() => {
+                        blackjackGame.init('blackjack-section');
+                    }, 100);
+                    break;
+                    case 'roulette':
+                    document.getElementById('games-section').classList.add('hidden');
+                    document.getElementById('roulette-section').classList.remove('hidden');
+                    # Initialize roulette game
+                    setTimeout(() => {
+                        rouletteGame.init('roulette-section');
+                    }, 100);
+                    break;
+                    showToast('Slots coming soon!');
+                    break;
+                case 'dice':
+                    showToast('Dice games coming soon!');
+                    break;
+                case 'minigames':
+                    showToast('Mini-games coming soon!');
+                    break;
+                default:
+                    showToast('Game not yet available');
+            }
+        }
+
+        /* ========================================== */
+        /* TOAST NOTIFICATION */
+        /* ========================================== */
+
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed;
+                bottom: 30px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: var(--card);
+                border: 1px solid var(--border);
+                padding: 12px 24px;
+                border-radius: 8px;
+                color: var(--fg);
+                font-family: 'Orbitron', sans-serif;
+                z-index: 200;
+                animation: slideIn 0.3s ease;
+            `;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        /* ========================================== */
+        /* GLOBAL EXPORTS */
+        /* ========================================== */
+
+        window.NEON = {
+            gameManager,
+            audioManager,
+            saveManager,
+            progressionManager,
+            randomManager,
+            achievementManager,
+            blackjackGame,
+            updateUI,
+            showToast,
+            navigateToSection
+        };
+    </script>
+</body>
+</html>
